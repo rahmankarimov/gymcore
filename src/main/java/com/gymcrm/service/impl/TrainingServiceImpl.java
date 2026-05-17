@@ -1,0 +1,58 @@
+package com.gymcrm.service.impl;
+
+import com.gymcrm.dao.TraineeDao;
+import com.gymcrm.dao.TrainerDao;
+import com.gymcrm.dao.TrainingDao;
+import com.gymcrm.domain.Training;
+import com.gymcrm.service.TrainingService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.Optional;
+
+@Service
+public class TrainingServiceImpl implements TrainingService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(TrainingServiceImpl.class);
+
+    private TrainingDao trainingDao;
+    private TraineeDao traineeDao;
+    private TrainerDao trainerDao;
+
+    @Override
+    public Training createProfile(Training training) {
+        LOGGER.info("Creating training profile named {}", training.getTrainingName());
+        if (traineeDao.findById(training.getTraineeId()).isEmpty()) {
+            throw new IllegalArgumentException("Trainee not found: " + training.getTraineeId());
+        }
+        if (trainerDao.findById(training.getTrainerId()).isEmpty()) {
+            throw new IllegalArgumentException("Trainer not found: " + training.getTrainerId());
+        }
+        if (training.getTrainingDuration() <= 0) {
+            throw new IllegalArgumentException("Training duration must be positive");
+        }
+        return trainingDao.save(training);
+    }
+
+    @Override
+    public Optional<Training> selectProfileById(Long id) {
+        LOGGER.info("Selecting training profile with id {}", id);
+        return trainingDao.findById(id);
+    }
+
+    @Autowired
+    public void setTrainingDao(TrainingDao trainingDao) {
+        this.trainingDao = trainingDao;
+    }
+
+    @Autowired
+    public void setTraineeDao(TraineeDao traineeDao) {
+        this.traineeDao = traineeDao;
+    }
+
+    @Autowired
+    public void setTrainerDao(TrainerDao trainerDao) {
+        this.trainerDao = trainerDao;
+    }
+}
