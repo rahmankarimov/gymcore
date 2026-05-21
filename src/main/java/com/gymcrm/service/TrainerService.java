@@ -1,7 +1,10 @@
 package com.gymcrm.service;
 
 import com.gymcrm.domain.Trainer;
+import com.gymcrm.domain.Training;
 
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 public interface TrainerService {
@@ -10,4 +13,15 @@ public interface TrainerService {
     Trainer updateProfile(Trainer trainer);
 
     Optional<Trainer> selectProfileById(Long id);
+
+    Optional<Trainer> selectProfileByUsername(String username, String password);
+
+    boolean authenticate(String username, String password);
+
+    void changePassword(String username, String oldPassword, String newPassword);
+
+    void changeActiveState(String username, String password, boolean active);
+
+    List<Training> getTrainings(String username, String password, LocalDate fromDate, LocalDate toDate,
+                                String traineeName);
 }

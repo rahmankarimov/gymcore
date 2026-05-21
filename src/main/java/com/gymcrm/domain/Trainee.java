@@ -1,11 +1,31 @@
 package com.gymcrm.domain;
 
-import java.time.LocalDate;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Entity;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
 
+import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.Set;
+
+@Entity
+@Table(name = "trainees")
 public class Trainee extends User {
-    private Long id;
     private LocalDate dateOfBirth;
     private String address;
+
+    @ManyToMany
+    @JoinTable(name = "trainee_trainers",
+            joinColumns = @JoinColumn(name = "trainee_id"),
+            inverseJoinColumns = @JoinColumn(name = "trainer_id"))
+    private Set<Trainer> trainers = new HashSet<>();
+
+    @OneToMany(mappedBy = "trainee", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    private Set<Training> trainings = new HashSet<>();
 
     public Trainee() {
     }
@@ -13,17 +33,9 @@ public class Trainee extends User {
     public Trainee(Long id, String firstName, String lastName, String username, String password,
                    boolean active, LocalDate dateOfBirth, String address) {
         super(firstName, lastName, username, password, active);
-        this.id = id;
+        setId(id);
         this.dateOfBirth = dateOfBirth;
         this.address = address;
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
     }
 
     public LocalDate getDateOfBirth() {
@@ -42,8 +54,16 @@ public class Trainee extends User {
         this.address = address;
     }
 
+    public Set<Trainer> getTrainers() {
+        return trainers;
+    }
+
+    public void setTrainers(Set<Trainer> trainers) {
+        this.trainers = trainers;
+    }
+
     @Override
     public String toString() {
-        return "Trainee{id=" + id + ", username='" + getUsername() + "'}";
+        return "Trainee{id=" + getId() + ", username='" + getUsername() + "'}";
     }
 }

@@ -5,6 +5,7 @@ import com.gymcrm.domain.Trainer;
 import com.gymcrm.domain.Training;
 import com.gymcrm.util.PasswordGenerator;
 import com.gymcrm.util.UsernameGenerator;
+import com.gymcrm.exception.ValidationException;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,7 +64,7 @@ public class StorageInitializer {
             case "TRAINER" -> parseTrainer(parts);
             case "TRAINING" -> parseTraining(parts);
             case "TRAINING_TYPE" -> parseTrainingType(parts);
-            default -> throw new IllegalArgumentException("Unknown record type: " + parts[0]);
+            default -> throw new ValidationException("Unknown record type: " + parts[0]);
         }
     }
 
@@ -122,7 +123,7 @@ public class StorageInitializer {
 
     private void requireLength(String[] parts, int expected) {
         if (parts.length != expected) {
-            throw new IllegalArgumentException("Invalid record length for " + parts[0]);
+            throw new ValidationException("Invalid record length for " + parts[0]);
         }
     }
 
