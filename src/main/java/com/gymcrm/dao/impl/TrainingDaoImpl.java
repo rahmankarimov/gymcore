@@ -1,49 +1,101 @@
 package com.gymcrm.dao.impl;
 
 import com.gymcrm.dao.TrainingDao;
+import com.gymcrm.domain.Trainee;
+import com.gymcrm.domain.Trainer;
 import com.gymcrm.domain.Training;
-import com.gymcrm.storage.InMemoryStorage;
+import com.gymcrm.domain.TrainingType;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.TypedQuery;
+import com.gymcrm.exception.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
+@Transactional
 public class TrainingDaoImpl implements TrainingDao {
     private static final Logger LOGGER = LoggerFactory.getLogger(TrainingDaoImpl.class);
 
-    private InMemoryStorage storage;
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @Override
     public Training save(Training training) {
-        if (training.getId() == null) {
-            training.setId(storage.nextTrainingId());
-        } else {
-            storage.syncTrainingId(training.getId());
-        }
-        storage.getTrainings().put(training.getId(), training);
-        storage.findOrCreateTrainingType(training.getTrainingType());
-        LOGGER.info("Created training with id {}", training.getId());
+        training.setTrainee(entityManager.getReference(Trainee.class, training.getTraineeId()));
+        training.setTrainer(entityManager.getReference(Trainer.class, training.getTrainerId()));
+        training.setTrainingTypeEntity(findType(training.getTrainingType()));
+        entityManager.persist(training);
+        LOGGER.info("Created training with name {}", training.getTrainingName());
         return training;
     }
 
     @Override
     public Optional<Training> findById(Long id) {
-        LOGGER.info("Selecting training with id {}", id);
-        return Optional.ofNullable(storage.getTrainings().get(id));
+        return Optional.ofNullable(entityManager.find(Training.class, id));
+    }
+
+    @Override
+    public List<Training> findByTraineeCriteria(String traineeUsername, LocalDate fromDate, LocalDate toDate,
+                                                String trainerName, String trainingType) {
+        String jpql = """
+                select trn from Training trn
+                join trn.trainee trainee
+                join trn.trainer trainer
+                join trn.trainingType type
+                where trainee.username = :traineeUsername
+                and (:fromDate is null or trn.trainingDate >= :fromDate)
+                and (:toDate is null or trn.trainingDate <= :toDate)
+                and (:trainerName is null or concat(trainer.firstName, ' ', trainer.lastName) = :trainerName)
+                and (:trainingType is null or type.trainingTypeName = :trainingType)
+                """;
+        TypedQuery<Training> query = entityManager.createQuery(jpql, Training.class);
+        query.setParameter("traineeUsername", traineeUsername);
+        query.setParameter("fromDate", fromDate);
+        query.setParameter("toDate", toDate);
+        query.setParameter("trainerName", trainerName);
+        query.setParameter("trainingType", trainingType);
+        return query.getResultList();
+    }
+
+    @Override
+    public List<Training> findByTrainerCriteria(String trainerUsername, LocalDate fromDate, LocalDate toDate,
+                                                String traineeName) {
+        String jpql = """
+                select trn from Training trn
+                join trn.trainee trainee
+                join trn.trainer trainer
+                where trainer.username = :trainerUsername
+                and (:fromDate is null or trn.trainingDate >= :fromDate)
+                and (:toDate is null or trn.trainingDate <= :toDate)
+                and (:traineeName is null or concat(trainee.firstName, ' ', trainee.lastName) = :traineeName)
+                """;
+        TypedQuery<Training> query = entityManager.createQuery(jpql, Training.class);
+        query.setParameter("trainerUsername", trainerUsername);
+        query.setParameter("fromDate", fromDate);
+        query.setParameter("toDate", toDate);
+        query.setParameter("traineeName", traineeName);
+        return query.getResultList();
     }
 
     @Override
     public List<Training> findAll() {
-        return new ArrayList<>(storage.getTrainings().values());
+        return entityManager.createQuery(
+                "select t from Training t join fetch t.trainingType", Training.class).getResultList();
     }
 
-    @Autowired
-    public void setStorage(InMemoryStorage storage) {
-        this.storage = storage;
+    private TrainingType findType(String name) {
+        return entityManager.createQuery(
+                        "select t from TrainingType t where t.trainingTypeName = :name", TrainingType.class)
+                .setParameter("name", name)
+                .getResultStream()
+                .findFirst()
+                .orElseThrow(() -> new EntityNotFoundException("Training type not found: " + name));
     }
 }

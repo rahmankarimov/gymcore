@@ -12,5 +12,13 @@ public interface TrainerDao {
 
     Optional<Trainer> findById(Long id);
 
+    Optional<Trainer> findByUsername(String username);
+
+    boolean credentialsMatch(String username, String password);
+
+    void changePassword(String username, String password);
+
+    void setActive(String username, boolean active);
+
     List<Trainer> findAll();
 }

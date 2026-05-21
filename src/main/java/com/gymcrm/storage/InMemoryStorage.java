@@ -5,7 +5,10 @@ import com.gymcrm.domain.Trainer;
 import com.gymcrm.domain.Training;
 import com.gymcrm.domain.TrainingType;
 import org.springframework.stereotype.Component;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -22,6 +25,7 @@ public class InMemoryStorage {
     private final AtomicLong trainerIdSequence = new AtomicLong(0);
     private final AtomicLong trainingIdSequence = new AtomicLong(0);
     private final AtomicLong trainingTypeIdSequence = new AtomicLong(0);
+    private JdbcTemplate jdbcTemplate;
 
     public Map<Long, Trainee> getTrainees() {
         return trainees;
@@ -94,6 +98,22 @@ public class InMemoryStorage {
         trainerIdSequence.set(0);
         trainingIdSequence.set(0);
         trainingTypeIdSequence.set(0);
+        clearDatabase();
+    }
+
+    private void clearDatabase() {
+        if (jdbcTemplate == null) {
+            return;
+        }
+        jdbcTemplate.execute("SET REFERENTIAL_INTEGRITY FALSE");
+        List.of("trainings", "trainee_trainers", "trainees", "trainers", "users")
+                .forEach(table -> jdbcTemplate.execute("TRUNCATE TABLE " + table + " RESTART IDENTITY"));
+        jdbcTemplate.execute("SET REFERENTIAL_INTEGRITY TRUE");
+    }
+
+    @Autowired(required = false)
+    public void setJdbcTemplate(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     private void syncSequence(AtomicLong sequence, long id) {
