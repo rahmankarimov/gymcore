@@ -41,7 +41,11 @@ public class TrainerDaoImpl implements TrainerDao {
 
     @Override
     public Optional<Trainer> findByUsername(String username) {
-        return entityManager.createQuery("select t from Trainer t where t.username = :username", Trainer.class)
+        return entityManager.createQuery("""
+                        select distinct t from Trainer t
+                        left join fetch t.trainees
+                        where t.username = :username
+                        """, Trainer.class)
                 .setParameter("username", username)
                 .getResultStream()
                 .findFirst();

@@ -1,6 +1,7 @@
 package com.gymcrm.dao;
 
 import com.gymcrm.domain.Training;
+import com.gymcrm.domain.TrainingType;
 
 import java.util.List;
 import java.util.Optional;
@@ -18,4 +19,6 @@ public interface TrainingDao {
                                          String traineeName);
 
     List<Training> findAll();
+
+    List<TrainingType> findTrainingTypes();
 }

@@ -4,6 +4,9 @@ import com.gymcrm.dao.TraineeDao;
 import com.gymcrm.dao.TrainerDao;
 import com.gymcrm.dao.TrainingDao;
 import com.gymcrm.domain.Training;
+import com.gymcrm.domain.TrainingType;
+import com.gymcrm.domain.Trainee;
+import com.gymcrm.domain.Trainer;
 import com.gymcrm.service.TrainingService;
 import com.gymcrm.exception.EntityNotFoundException;
 import com.gymcrm.exception.ValidationException;
@@ -14,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
+import java.util.List;
 
 @Service
 public class TrainingServiceImpl implements TrainingService {
@@ -54,10 +58,39 @@ public class TrainingServiceImpl implements TrainingService {
     }
 
     @Override
+    @Transactional
+    public Training createProfileForAuthenticatedUser(String authenticatedUsername, String password,
+                                                     String traineeUsername, String trainerUsername,
+                                                     Training training) {
+        boolean authenticated = traineeDao.credentialsMatch(authenticatedUsername, password)
+                || trainerDao.credentialsMatch(authenticatedUsername, password);
+        if (!authenticated) {
+            throw new SecurityException("Invalid credentials");
+        }
+        if (!authenticatedUsername.equals(traineeUsername) && !authenticatedUsername.equals(trainerUsername)) {
+            throw new SecurityException("Authenticated user must be trainee or trainer from request");
+        }
+        Trainee trainee = traineeDao.findByUsername(traineeUsername)
+                .orElseThrow(() -> new EntityNotFoundException("Trainee not found: " + traineeUsername));
+        Trainer trainer = trainerDao.findByUsername(trainerUsername)
+                .orElseThrow(() -> new EntityNotFoundException("Trainer not found: " + trainerUsername));
+        training.setTraineeId(trainee.getId());
+        training.setTrainerId(trainer.getId());
+        training.setTrainingType(trainer.getSpecialization());
+        return createProfile(training);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public Optional<Training> selectProfileById(Long id) {
         LOGGER.info("Selecting training profile with id {}", id);
         return trainingDao.findById(id);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TrainingType> getTrainingTypes() {
+        return trainingDao.findTrainingTypes();
     }
 
     @Autowired

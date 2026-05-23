@@ -51,7 +51,11 @@ public class TraineeDaoImpl implements TraineeDao {
 
     @Override
     public Optional<Trainee> findByUsername(String username) {
-        return entityManager.createQuery("select t from Trainee t where t.username = :username", Trainee.class)
+        return entityManager.createQuery("""
+                        select distinct t from Trainee t
+                        left join fetch t.trainers
+                        where t.username = :username
+                        """, Trainee.class)
                 .setParameter("username", username)
                 .getResultStream()
                 .findFirst();
@@ -99,7 +103,7 @@ public class TraineeDaoImpl implements TraineeDao {
     @Override
     public List<Trainer> findUnassignedTrainers(String username) {
         return entityManager.createQuery("""
-                        select tr from Trainer tr
+                        select distinct tr from Trainer tr
                         where tr not in (
                             select assigned from Trainee t join t.trainers assigned
                             where t.username = :username
