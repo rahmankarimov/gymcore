@@ -46,9 +46,9 @@ public class TrainingDaoImpl implements TrainingDao {
                                                 String trainerName, String trainingType) {
         String jpql = """
                 select trn from Training trn
-                join trn.trainee trainee
-                join trn.trainer trainer
-                join trn.trainingType type
+                join fetch trn.trainee trainee
+                join fetch trn.trainer trainer
+                join fetch trn.trainingType type
                 where trainee.username = :traineeUsername
                 and (:fromDate is null or trn.trainingDate >= :fromDate)
                 and (:toDate is null or trn.trainingDate <= :toDate)
@@ -69,8 +69,9 @@ public class TrainingDaoImpl implements TrainingDao {
                                                 String traineeName) {
         String jpql = """
                 select trn from Training trn
-                join trn.trainee trainee
-                join trn.trainer trainer
+                join fetch trn.trainee trainee
+                join fetch trn.trainer trainer
+                join fetch trn.trainingType type
                 where trainer.username = :trainerUsername
                 and (:fromDate is null or trn.trainingDate >= :fromDate)
                 and (:toDate is null or trn.trainingDate <= :toDate)
@@ -88,6 +89,11 @@ public class TrainingDaoImpl implements TrainingDao {
     public List<Training> findAll() {
         return entityManager.createQuery(
                 "select t from Training t join fetch t.trainingType", Training.class).getResultList();
+    }
+
+    @Override
+    public List<TrainingType> findTrainingTypes() {
+        return entityManager.createQuery("select t from TrainingType t", TrainingType.class).getResultList();
     }
 
     private TrainingType findType(String name) {
