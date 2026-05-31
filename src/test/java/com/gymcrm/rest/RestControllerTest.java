@@ -2,6 +2,7 @@ package com.gymcrm.rest;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.gymcrm.TestDatabaseCleaner;
 import com.gymcrm.config.AppConfig;
 import com.gymcrm.domain.Trainee;
 import com.gymcrm.domain.Trainer;
@@ -11,7 +12,7 @@ import com.gymcrm.rest.dto.TrainerRegistrationRequest;
 import com.gymcrm.service.TraineeService;
 import com.gymcrm.service.TrainerService;
 import com.gymcrm.service.TrainingService;
-import com.gymcrm.storage.InMemoryStorage;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,14 +44,14 @@ class RestControllerTest {
     private TrainingService trainingService;
 
     @Autowired
-    private InMemoryStorage storage;
+    private TestDatabaseCleaner databaseCleaner;
 
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
 
     @BeforeEach
     void setUp() {
-        storage.clear();
+        databaseCleaner.clean();
         objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
         mockMvc = MockMvcBuilders.standaloneSetup(
                         new AuthController(traineeService, trainerService),
@@ -58,7 +59,7 @@ class RestControllerTest {
                         new TrainerController(trainerService),
                         new TrainingController(trainingService))
                 .setControllerAdvice(new RestExceptionHandler())
-                .addFilters(new RestLoggingFilter())
+                .addFilters(new RestLoggingFilter(new SimpleMeterRegistry()))
                 .build();
     }
 
