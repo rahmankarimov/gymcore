@@ -1,8 +1,8 @@
 package com.gymcrm.dao;
 
 import com.gymcrm.config.AppConfig;
+import com.gymcrm.TestDatabaseCleaner;
 import com.gymcrm.domain.Trainee;
-import com.gymcrm.storage.InMemoryStorage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,11 +21,11 @@ class TraineeDaoTest {
     private TraineeDao traineeDao;
 
     @Autowired
-    private InMemoryStorage storage;
+    private TestDatabaseCleaner databaseCleaner;
 
     @BeforeEach
     void setUp() {
-        storage.clear();
+        databaseCleaner.clean();
     }
 
     @Test
