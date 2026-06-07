@@ -4,7 +4,6 @@ import com.gymcrm.domain.Trainee;
 import com.gymcrm.exception.EntityNotFoundException;
 import com.gymcrm.exception.ValidationException;
 import com.gymcrm.rest.dto.ActiveStateRequest;
-import com.gymcrm.rest.dto.AuthCredentials;
 import com.gymcrm.rest.dto.RegistrationResponse;
 import com.gymcrm.rest.dto.TraineeProfileResponse;
 import com.gymcrm.rest.dto.TraineeRegistrationRequest;
@@ -16,7 +15,6 @@ import com.gymcrm.rest.dto.TrainerSummaryResponse;
 import com.gymcrm.service.TraineeService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -55,28 +53,24 @@ public class TraineeController {
 
     @ApiOperation("Get trainee profile")
     @GetMapping("/profile")
-    public TraineeProfileResponse getProfile(@RequestParam("username") String username,
-                                             HttpServletRequest servletRequest) {
-        AuthCredentials credentials = RestSupport.basicAuth(servletRequest);
-        RestSupport.requireOwner(username, credentials);
-        Trainee trainee = traineeService.selectProfileByUsername(username, credentials.password())
+    public TraineeProfileResponse getProfile(@RequestParam("username") String username) {
+        RestSupport.requireOwner(username, RestSupport.authenticatedUsername());
+        Trainee trainee = traineeService.selectProfileByUsername(username)
                 .orElseThrow(() -> new EntityNotFoundException("Trainee not found: " + username));
         return RestSupport.traineeProfile(trainee);
     }
 
     @ApiOperation("Update trainee profile")
     @PutMapping("/profile")
-    public TraineeProfileResponse updateProfile(@RequestBody TraineeUpdateRequest request,
-                                                HttpServletRequest servletRequest) {
-        AuthCredentials credentials = RestSupport.basicAuth(servletRequest);
+    public TraineeProfileResponse updateProfile(@RequestBody TraineeUpdateRequest request) {
         RestSupport.requireText(request.username(), "Username");
-        RestSupport.requireOwner(request.username(), credentials);
+        RestSupport.requireOwner(request.username(), RestSupport.authenticatedUsername());
         RestSupport.requireText(request.firstName(), "First name");
         RestSupport.requireText(request.lastName(), "Last name");
         if (request.active() == null) {
             throw new ValidationException("Is active is required");
         }
-        Trainee existing = traineeService.selectProfileByUsername(request.username(), credentials.password())
+        Trainee existing = traineeService.selectProfileByUsername(request.username())
                 .orElseThrow(() -> new EntityNotFoundException("Trainee not found: " + request.username()));
         Trainee updated = new Trainee(existing.getId(), request.firstName(), request.lastName(), existing.getUsername(),
                 existing.getPassword(), request.active(), request.dateOfBirth(), request.address());
@@ -86,21 +80,17 @@ public class TraineeController {
 
     @ApiOperation("Delete trainee profile")
     @DeleteMapping("/profile")
-    public ResponseEntity<Void> deleteProfile(@RequestParam("username") String username,
-                                              HttpServletRequest servletRequest) {
-        AuthCredentials credentials = RestSupport.basicAuth(servletRequest);
-        RestSupport.requireOwner(username, credentials);
-        traineeService.deleteProfileByUsername(username, credentials.password());
+    public ResponseEntity<Void> deleteProfile(@RequestParam("username") String username) {
+        RestSupport.requireOwner(username, RestSupport.authenticatedUsername());
+        traineeService.deleteProfileByUsername(username);
         return ResponseEntity.ok().build();
     }
 
     @ApiOperation("Get active trainers not assigned to trainee")
     @GetMapping("/unassigned-trainers")
-    public List<TrainerSummaryResponse> getUnassignedTrainers(@RequestParam("username") String username,
-                                                              HttpServletRequest servletRequest) {
-        AuthCredentials credentials = RestSupport.basicAuth(servletRequest);
-        RestSupport.requireOwner(username, credentials);
-        return traineeService.getUnassignedTrainers(username, credentials.password()).stream()
+    public List<TrainerSummaryResponse> getUnassignedTrainers(@RequestParam("username") String username) {
+        RestSupport.requireOwner(username, RestSupport.authenticatedUsername());
+        return traineeService.getUnassignedTrainers(username).stream()
                 .filter(trainer -> trainer.isActive())
                 .map(RestSupport::trainerSummary)
                 .toList();
@@ -108,16 +98,13 @@ public class TraineeController {
 
     @ApiOperation("Update trainee trainers list")
     @PutMapping("/trainers")
-    public TrainerListResponse updateTrainers(@RequestBody TrainerListUpdateRequest request,
-                                              HttpServletRequest servletRequest) {
-        AuthCredentials credentials = RestSupport.basicAuth(servletRequest);
+    public TrainerListResponse updateTrainers(@RequestBody TrainerListUpdateRequest request) {
         RestSupport.requireText(request.traineeUsername(), "Trainee username");
-        RestSupport.requireOwner(request.traineeUsername(), credentials);
+        RestSupport.requireOwner(request.traineeUsername(), RestSupport.authenticatedUsername());
         if (request.trainerUsernames() == null || request.trainerUsernames().isEmpty()) {
             throw new ValidationException("Trainers list is required");
         }
-        Trainee trainee = traineeService.updateTrainers(request.traineeUsername(), credentials.password(),
-                Set.copyOf(request.trainerUsernames()));
+        Trainee trainee = traineeService.updateTrainers(request.traineeUsername(), Set.copyOf(request.trainerUsernames()));
         return new TrainerListResponse(trainee.getTrainers().stream().map(RestSupport::trainerSummary).toList());
     }
 
@@ -128,24 +115,21 @@ public class TraineeController {
             @RequestParam(value = "periodFrom", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate periodFrom,
             @RequestParam(value = "periodTo", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate periodTo,
             @RequestParam(value = "trainerName", required = false) String trainerName,
-            @RequestParam(value = "trainingType", required = false) String trainingType,
-            HttpServletRequest servletRequest) {
-        AuthCredentials credentials = RestSupport.basicAuth(servletRequest);
-        RestSupport.requireOwner(username, credentials);
+            @RequestParam(value = "trainingType", required = false) String trainingType) {
+        RestSupport.requireOwner(username, RestSupport.authenticatedUsername());
         return RestSupport.traineeTrainings(traineeService.getTrainings(
-                username, credentials.password(), periodFrom, periodTo, trainerName, trainingType));
+                username, periodFrom, periodTo, trainerName, trainingType));
     }
 
     @ApiOperation("Activate or deactivate trainee")
     @PatchMapping("/active")
-    public ResponseEntity<Void> changeActive(@RequestBody ActiveStateRequest request, HttpServletRequest servletRequest) {
-        AuthCredentials credentials = RestSupport.basicAuth(servletRequest);
+    public ResponseEntity<Void> changeActive(@RequestBody ActiveStateRequest request) {
         RestSupport.requireText(request.username(), "Username");
-        RestSupport.requireOwner(request.username(), credentials);
+        RestSupport.requireOwner(request.username(), RestSupport.authenticatedUsername());
         if (request.active() == null) {
             throw new ValidationException("Is active is required");
         }
-        traineeService.changeActiveState(request.username(), credentials.password(), request.active());
+        traineeService.changeActiveState(request.username(), request.active());
         return ResponseEntity.ok().build();
     }
 }

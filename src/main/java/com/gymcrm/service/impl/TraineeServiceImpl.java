@@ -13,6 +13,7 @@ import com.gymcrm.exception.ValidationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +33,7 @@ public class TraineeServiceImpl implements TraineeService {
     private com.gymcrm.dao.TrainingDao trainingDao;
     private UsernameGenerator usernameGenerator;
     private PasswordGenerator passwordGenerator;
+    private PasswordEncoder passwordEncoder;
 
     @Override
     @Transactional
@@ -40,8 +42,11 @@ public class TraineeServiceImpl implements TraineeService {
         LOGGER.info("Creating trainee profile for {} {}", trainee.getFirstName(), trainee.getLastName());
         trainee.setUsername(usernameGenerator.generate(
                 trainee.getFirstName(), trainee.getLastName(), existingUsernames()));
-        trainee.setPassword(passwordGenerator.generate());
-        return traineeDao.save(trainee);
+        String rawPassword = passwordGenerator.generate();
+        trainee.setPassword(passwordEncoder.encode(rawPassword));
+        Trainee saved = traineeDao.save(trainee);
+        return new Trainee(saved.getId(), saved.getFirstName(), saved.getLastName(), saved.getUsername(),
+                rawPassword, saved.isActive(), saved.getDateOfBirth(), saved.getAddress());
     }
 
     @Override
@@ -75,60 +80,55 @@ public class TraineeServiceImpl implements TraineeService {
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<Trainee> selectProfileByUsername(String username, String password) {
-        requireAuthenticated(username, password);
+    public Optional<Trainee> selectProfileByUsername(String username) {
         return traineeDao.findByUsername(username);
     }
 
     @Override
     @Transactional(readOnly = true)
     public boolean authenticate(String username, String password) {
-        return traineeDao.credentialsMatch(username, password);
+        return traineeDao.findByUsername(username)
+                .filter(trainee -> passwordEncoder.matches(password, trainee.getPassword()))
+                .isPresent();
     }
 
     @Override
     @Transactional
-    public void changePassword(String username, String oldPassword, String newPassword) {
-        requireAuthenticated(username, oldPassword);
+    public void changePassword(String username, String newPassword) {
         if (isBlank(newPassword)) {
             throw new ValidationException("Password is required");
         }
-        traineeDao.changePassword(username, newPassword);
+        traineeDao.changePassword(username, passwordEncoder.encode(newPassword));
     }
 
     @Override
     @Transactional
-    public void changeActiveState(String username, String password, boolean active) {
-        requireAuthenticated(username, password);
+    public void changeActiveState(String username, boolean active) {
         traineeDao.setActive(username, active);
     }
 
     @Override
     @Transactional
-    public void deleteProfileByUsername(String username, String password) {
-        requireAuthenticated(username, password);
+    public void deleteProfileByUsername(String username) {
         traineeDao.deleteByUsername(username);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<Training> getTrainings(String username, String password, LocalDate fromDate, LocalDate toDate,
+    public List<Training> getTrainings(String username, LocalDate fromDate, LocalDate toDate,
                                        String trainerName, String trainingType) {
-        requireAuthenticated(username, password);
         return trainingDao.findByTraineeCriteria(username, fromDate, toDate, trainerName, trainingType);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<Trainer> getUnassignedTrainers(String username, String password) {
-        requireAuthenticated(username, password);
+    public List<Trainer> getUnassignedTrainers(String username) {
         return traineeDao.findUnassignedTrainers(username);
     }
 
     @Override
     @Transactional
-    public Trainee updateTrainers(String username, String password, Set<String> trainerUsernames) {
-        requireAuthenticated(username, password);
+    public Trainee updateTrainers(String username, Set<String> trainerUsernames) {
         return traineeDao.updateTrainers(username, trainerUsernames);
     }
 
@@ -137,12 +137,6 @@ public class TraineeServiceImpl implements TraineeService {
                         traineeDao.findAll().stream().map(Trainee::getUsername),
                         trainerDao.findAll().stream().map(Trainer::getUsername))
                 .collect(Collectors.toSet());
-    }
-
-    private void requireAuthenticated(String username, String password) {
-        if (!traineeDao.credentialsMatch(username, password)) {
-            throw new SecurityException("Invalid trainee credentials");
-        }
     }
 
     private void validateUser(Trainee trainee) {
@@ -178,5 +172,10 @@ public class TraineeServiceImpl implements TraineeService {
     @Autowired
     public void setPasswordGenerator(PasswordGenerator passwordGenerator) {
         this.passwordGenerator = passwordGenerator;
+    }
+
+    @Autowired
+    public void setPasswordEncoder(PasswordEncoder passwordEncoder) {
+        this.passwordEncoder = passwordEncoder;
     }
 }

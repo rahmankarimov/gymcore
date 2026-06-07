@@ -13,6 +13,7 @@ import com.gymcrm.exception.ValidationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +33,7 @@ public class TrainerServiceImpl implements TrainerService {
     private com.gymcrm.dao.TrainingDao trainingDao;
     private UsernameGenerator usernameGenerator;
     private PasswordGenerator passwordGenerator;
+    private PasswordEncoder passwordEncoder;
 
     @Override
     @Transactional
@@ -40,8 +42,11 @@ public class TrainerServiceImpl implements TrainerService {
         LOGGER.info("Creating trainer profile for {} {}", trainer.getFirstName(), trainer.getLastName());
         trainer.setUsername(usernameGenerator.generate(
                 trainer.getFirstName(), trainer.getLastName(), existingUsernames()));
-        trainer.setPassword(passwordGenerator.generate());
-        return trainerDao.save(trainer);
+        String rawPassword = passwordGenerator.generate();
+        trainer.setPassword(passwordEncoder.encode(rawPassword));
+        Trainer saved = trainerDao.save(trainer);
+        return new Trainer(saved.getId(), saved.getFirstName(), saved.getLastName(), saved.getUsername(),
+                rawPassword, saved.isActive(), saved.getSpecialization());
     }
 
     @Override
@@ -65,39 +70,37 @@ public class TrainerServiceImpl implements TrainerService {
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<Trainer> selectProfileByUsername(String username, String password) {
-        requireAuthenticated(username, password);
+    public Optional<Trainer> selectProfileByUsername(String username) {
         return trainerDao.findByUsername(username);
     }
 
     @Override
     @Transactional(readOnly = true)
     public boolean authenticate(String username, String password) {
-        return trainerDao.credentialsMatch(username, password);
+        return trainerDao.findByUsername(username)
+                .filter(trainer -> passwordEncoder.matches(password, trainer.getPassword()))
+                .isPresent();
     }
 
     @Override
     @Transactional
-    public void changePassword(String username, String oldPassword, String newPassword) {
-        requireAuthenticated(username, oldPassword);
+    public void changePassword(String username, String newPassword) {
         if (newPassword == null || newPassword.isBlank()) {
             throw new ValidationException("Password is required");
         }
-        trainerDao.changePassword(username, newPassword);
+        trainerDao.changePassword(username, passwordEncoder.encode(newPassword));
     }
 
     @Override
     @Transactional
-    public void changeActiveState(String username, String password, boolean active) {
-        requireAuthenticated(username, password);
+    public void changeActiveState(String username, boolean active) {
         trainerDao.setActive(username, active);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<Training> getTrainings(String username, String password, LocalDate fromDate, LocalDate toDate,
+    public List<Training> getTrainings(String username, LocalDate fromDate, LocalDate toDate,
                                        String traineeName) {
-        requireAuthenticated(username, password);
         return trainingDao.findByTrainerCriteria(username, fromDate, toDate, traineeName);
     }
 
@@ -106,12 +109,6 @@ public class TrainerServiceImpl implements TrainerService {
                         traineeDao.findAll().stream().map(Trainee::getUsername),
                         trainerDao.findAll().stream().map(Trainer::getUsername))
                 .collect(Collectors.toSet());
-    }
-
-    private void requireAuthenticated(String username, String password) {
-        if (!trainerDao.credentialsMatch(username, password)) {
-            throw new SecurityException("Invalid trainer credentials");
-        }
     }
 
     private void validateUser(Trainer trainer) {
@@ -145,5 +142,10 @@ public class TrainerServiceImpl implements TrainerService {
     @Autowired
     public void setPasswordGenerator(PasswordGenerator passwordGenerator) {
         this.passwordGenerator = passwordGenerator;
+    }
+
+    @Autowired
+    public void setPasswordEncoder(PasswordEncoder passwordEncoder) {
+        this.passwordEncoder = passwordEncoder;
     }
 }
