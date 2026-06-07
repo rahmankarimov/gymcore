@@ -9,11 +9,7 @@ import java.util.Optional;
 public interface TrainingService {
     Training createProfile(Training training);
 
-    Training createProfile(String traineeUsername, String traineePassword,
-                           String trainerUsername, String trainerPassword,
-                           Training training);
-
-    Training createProfileForAuthenticatedUser(String authenticatedUsername, String password,
+    Training createProfileForAuthenticatedUser(String authenticatedUsername,
                                                String traineeUsername, String trainerUsername,
                                                Training training);
 

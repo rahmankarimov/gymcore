@@ -4,17 +4,15 @@ import com.gymcrm.domain.Trainee;
 import com.gymcrm.domain.Trainer;
 import com.gymcrm.domain.Training;
 import com.gymcrm.exception.ValidationException;
-import com.gymcrm.rest.dto.AuthCredentials;
 import com.gymcrm.rest.dto.TraineeProfileResponse;
 import com.gymcrm.rest.dto.TraineeSummaryResponse;
 import com.gymcrm.rest.dto.TraineeTrainingResponse;
 import com.gymcrm.rest.dto.TrainerProfileResponse;
 import com.gymcrm.rest.dto.TrainerSummaryResponse;
 import com.gymcrm.rest.dto.TrainerTrainingResponse;
-import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
 
@@ -22,17 +20,12 @@ final class RestSupport {
     private RestSupport() {
     }
 
-    static AuthCredentials basicAuth(HttpServletRequest request) {
-        String header = request.getHeader("Authorization");
-        if (header == null || !header.startsWith("Basic ")) {
-            throw new SecurityException("Basic authentication is required");
+    static String authenticatedUsername() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new SecurityException("Authentication is required");
         }
-        String decoded = new String(Base64.getDecoder().decode(header.substring(6)), StandardCharsets.UTF_8);
-        int separator = decoded.indexOf(':');
-        if (separator < 1) {
-            throw new SecurityException("Invalid Basic authentication header");
-        }
-        return new AuthCredentials(decoded.substring(0, separator), decoded.substring(separator + 1));
+        return authentication.getName();
     }
 
     static void requireText(String value, String fieldName) {
@@ -41,8 +34,8 @@ final class RestSupport {
         }
     }
 
-    static void requireOwner(String requestedUsername, AuthCredentials credentials) {
-        if (!requestedUsername.equals(credentials.username())) {
+    static void requireOwner(String requestedUsername, String authenticatedUsername) {
+        if (!requestedUsername.equals(authenticatedUsername)) {
             throw new SecurityException("Authenticated user does not match requested username");
         }
     }

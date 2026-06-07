@@ -4,7 +4,6 @@ import com.gymcrm.domain.Trainer;
 import com.gymcrm.exception.EntityNotFoundException;
 import com.gymcrm.exception.ValidationException;
 import com.gymcrm.rest.dto.ActiveStateRequest;
-import com.gymcrm.rest.dto.AuthCredentials;
 import com.gymcrm.rest.dto.RegistrationResponse;
 import com.gymcrm.rest.dto.TrainerProfileResponse;
 import com.gymcrm.rest.dto.TrainerRegistrationRequest;
@@ -13,7 +12,6 @@ import com.gymcrm.rest.dto.TrainerUpdateRequest;
 import com.gymcrm.service.TrainerService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -51,28 +49,24 @@ public class TrainerController {
 
     @ApiOperation("Get trainer profile")
     @GetMapping("/profile")
-    public TrainerProfileResponse getProfile(@RequestParam("username") String username,
-                                             HttpServletRequest servletRequest) {
-        AuthCredentials credentials = RestSupport.basicAuth(servletRequest);
-        RestSupport.requireOwner(username, credentials);
-        Trainer trainer = trainerService.selectProfileByUsername(username, credentials.password())
+    public TrainerProfileResponse getProfile(@RequestParam("username") String username) {
+        RestSupport.requireOwner(username, RestSupport.authenticatedUsername());
+        Trainer trainer = trainerService.selectProfileByUsername(username)
                 .orElseThrow(() -> new EntityNotFoundException("Trainer not found: " + username));
         return RestSupport.trainerProfile(trainer);
     }
 
     @ApiOperation("Update trainer profile")
     @PutMapping("/profile")
-    public TrainerProfileResponse updateProfile(@RequestBody TrainerUpdateRequest request,
-                                                HttpServletRequest servletRequest) {
-        AuthCredentials credentials = RestSupport.basicAuth(servletRequest);
+    public TrainerProfileResponse updateProfile(@RequestBody TrainerUpdateRequest request) {
         RestSupport.requireText(request.username(), "Username");
-        RestSupport.requireOwner(request.username(), credentials);
+        RestSupport.requireOwner(request.username(), RestSupport.authenticatedUsername());
         RestSupport.requireText(request.firstName(), "First name");
         RestSupport.requireText(request.lastName(), "Last name");
         if (request.active() == null) {
             throw new ValidationException("Is active is required");
         }
-        Trainer existing = trainerService.selectProfileByUsername(request.username(), credentials.password())
+        Trainer existing = trainerService.selectProfileByUsername(request.username())
                 .orElseThrow(() -> new EntityNotFoundException("Trainer not found: " + request.username()));
         Trainer updated = new Trainer(existing.getId(), request.firstName(), request.lastName(), existing.getUsername(),
                 existing.getPassword(), request.active(), existing.getSpecialization());
@@ -86,24 +80,20 @@ public class TrainerController {
             @RequestParam("username") String username,
             @RequestParam(value = "periodFrom", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate periodFrom,
             @RequestParam(value = "periodTo", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate periodTo,
-            @RequestParam(value = "traineeName", required = false) String traineeName,
-            HttpServletRequest servletRequest) {
-        AuthCredentials credentials = RestSupport.basicAuth(servletRequest);
-        RestSupport.requireOwner(username, credentials);
-        return RestSupport.trainerTrainings(trainerService.getTrainings(
-                username, credentials.password(), periodFrom, periodTo, traineeName));
+            @RequestParam(value = "traineeName", required = false) String traineeName) {
+        RestSupport.requireOwner(username, RestSupport.authenticatedUsername());
+        return RestSupport.trainerTrainings(trainerService.getTrainings(username, periodFrom, periodTo, traineeName));
     }
 
     @ApiOperation("Activate or deactivate trainer")
     @PatchMapping("/active")
-    public ResponseEntity<Void> changeActive(@RequestBody ActiveStateRequest request, HttpServletRequest servletRequest) {
-        AuthCredentials credentials = RestSupport.basicAuth(servletRequest);
+    public ResponseEntity<Void> changeActive(@RequestBody ActiveStateRequest request) {
         RestSupport.requireText(request.username(), "Username");
-        RestSupport.requireOwner(request.username(), credentials);
+        RestSupport.requireOwner(request.username(), RestSupport.authenticatedUsername());
         if (request.active() == null) {
             throw new ValidationException("Is active is required");
         }
-        trainerService.changeActiveState(request.username(), credentials.password(), request.active());
+        trainerService.changeActiveState(request.username(), request.active());
         return ResponseEntity.ok().build();
     }
 }

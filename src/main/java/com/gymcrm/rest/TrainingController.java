@@ -3,13 +3,11 @@ package com.gymcrm.rest;
 import com.gymcrm.domain.Training;
 import com.gymcrm.exception.ValidationException;
 import com.gymcrm.rest.dto.AddTrainingRequest;
-import com.gymcrm.rest.dto.AuthCredentials;
 import com.gymcrm.rest.dto.TrainingTypeResponse;
 import com.gymcrm.rest.dto.TrainingTypesResponse;
 import com.gymcrm.service.TrainingService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -29,9 +27,7 @@ public class TrainingController {
 
     @ApiOperation("Add training")
     @PostMapping
-    public ResponseEntity<Void> addTraining(@RequestBody AddTrainingRequest request,
-                                            HttpServletRequest servletRequest) {
-        AuthCredentials credentials = RestSupport.basicAuth(servletRequest);
+    public ResponseEntity<Void> addTraining(@RequestBody AddTrainingRequest request) {
         RestSupport.requireText(request.traineeUsername(), "Trainee username");
         RestSupport.requireText(request.trainerUsername(), "Trainer username");
         RestSupport.requireText(request.trainingName(), "Training name");
@@ -43,7 +39,7 @@ public class TrainingController {
         }
         Training training = new Training(null, null, null, request.trainingName(), null,
                 request.trainingDate(), request.trainingDuration());
-        trainingService.createProfileForAuthenticatedUser(credentials.username(), credentials.password(),
+        trainingService.createProfileForAuthenticatedUser(RestSupport.authenticatedUsername(),
                 request.traineeUsername(), request.trainerUsername(), training);
         return ResponseEntity.ok().build();
     }
@@ -51,6 +47,7 @@ public class TrainingController {
     @ApiOperation("Get training types")
     @GetMapping("/types")
     public TrainingTypesResponse getTrainingTypes() {
+        RestSupport.authenticatedUsername();
         return new TrainingTypesResponse(trainingService.getTrainingTypes().stream()
                 .map(type -> new TrainingTypeResponse(type.getId(), type.getTrainingTypeName()))
                 .toList());

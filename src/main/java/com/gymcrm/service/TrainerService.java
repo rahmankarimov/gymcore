@@ -14,14 +14,14 @@ public interface TrainerService {
 
     Optional<Trainer> selectProfileById(Long id);
 
-    Optional<Trainer> selectProfileByUsername(String username, String password);
+    Optional<Trainer> selectProfileByUsername(String username);
 
     boolean authenticate(String username, String password);
 
-    void changePassword(String username, String oldPassword, String newPassword);
+    void changePassword(String username, String newPassword);
 
-    void changeActiveState(String username, String password, boolean active);
+    void changeActiveState(String username, boolean active);
 
-    List<Training> getTrainings(String username, String password, LocalDate fromDate, LocalDate toDate,
+    List<Training> getTrainings(String username, LocalDate fromDate, LocalDate toDate,
                                 String traineeName);
 }

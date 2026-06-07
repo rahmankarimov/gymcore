@@ -45,28 +45,9 @@ public class TrainingServiceImpl implements TrainingService {
 
     @Override
     @Transactional
-    public Training createProfile(String traineeUsername, String traineePassword,
-                                  String trainerUsername, String trainerPassword,
-                                  Training training) {
-        if (!traineeDao.credentialsMatch(traineeUsername, traineePassword)
-                || !trainerDao.credentialsMatch(trainerUsername, trainerPassword)) {
-            throw new SecurityException("Invalid trainee or trainer credentials");
-        }
-        training.setTraineeId(traineeDao.findByUsername(traineeUsername).orElseThrow().getId());
-        training.setTrainerId(trainerDao.findByUsername(trainerUsername).orElseThrow().getId());
-        return createProfile(training);
-    }
-
-    @Override
-    @Transactional
-    public Training createProfileForAuthenticatedUser(String authenticatedUsername, String password,
+    public Training createProfileForAuthenticatedUser(String authenticatedUsername,
                                                      String traineeUsername, String trainerUsername,
                                                      Training training) {
-        boolean authenticated = traineeDao.credentialsMatch(authenticatedUsername, password)
-                || trainerDao.credentialsMatch(authenticatedUsername, password);
-        if (!authenticated) {
-            throw new SecurityException("Invalid credentials");
-        }
         if (!authenticatedUsername.equals(traineeUsername) && !authenticatedUsername.equals(trainerUsername)) {
             throw new SecurityException("Authenticated user must be trainee or trainer from request");
         }
