@@ -1,0 +1,129 @@
+package com.gymcrm.service.impl;
+
+import com.gymcrm.dao.TraineeDao;
+import com.gymcrm.dao.TrainerDao;
+import com.gymcrm.dao.TrainingDao;
+import com.gymcrm.domain.Training;
+import com.gymcrm.domain.TrainingType;
+import com.gymcrm.domain.Trainee;
+import com.gymcrm.domain.Trainer;
+import com.gymcrm.service.TrainingService;
+import com.gymcrm.exception.EntityNotFoundException;
+import com.gymcrm.exception.ValidationException;
+import com.gymcrm.workload.TrainerWorkloadRequest;
+import com.gymcrm.workload.WorkloadActionType;
+import com.gymcrm.workload.WorkloadEventPublisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Optional;
+import java.util.List;
+
+@Service
+public class TrainingServiceImpl implements TrainingService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(TrainingServiceImpl.class);
+
+    private TrainingDao trainingDao;
+    private TraineeDao traineeDao;
+    private TrainerDao trainerDao;
+    private WorkloadEventPublisher workloadEventPublisher;
+
+    @Override
+    @Transactional
+    public Training createProfile(Training training) {
+        LOGGER.info("Creating training profile named {}", training.getTrainingName());
+        if (traineeDao.findById(training.getTraineeId()).isEmpty()) {
+            throw new EntityNotFoundException("Trainee not found: " + training.getTraineeId());
+        }
+        if (trainerDao.findById(training.getTrainerId()).isEmpty()) {
+            throw new EntityNotFoundException("Trainer not found: " + training.getTrainerId());
+        }
+        if (training.getTrainingDuration() <= 0) {
+            throw new ValidationException("Training duration must be positive");
+        }
+        return trainingDao.save(training);
+    }
+
+    @Override
+    @Transactional
+    public Training createProfileForAuthenticatedUser(String authenticatedUsername,
+                                                     String traineeUsername, String trainerUsername,
+                                                     Training training) {
+        if (!authenticatedUsername.equals(traineeUsername) && !authenticatedUsername.equals(trainerUsername)) {
+            throw new SecurityException("Authenticated user must be trainee or trainer from request");
+        }
+        Trainee trainee = traineeDao.findByUsername(traineeUsername)
+                .orElseThrow(() -> new EntityNotFoundException("Trainee not found: " + traineeUsername));
+        Trainer trainer = trainerDao.findByUsername(trainerUsername)
+                .orElseThrow(() -> new EntityNotFoundException("Trainer not found: " + trainerUsername));
+        training.setTraineeId(trainee.getId());
+        training.setTrainerId(trainer.getId());
+        training.setTrainingType(trainer.getSpecialization());
+        Training saved = createProfile(training);
+        publishWorkload(saved, trainer, WorkloadActionType.ADD);
+        return saved;
+    }
+
+    @Override
+    @Transactional
+    public void cancelTrainingForAuthenticatedUser(String authenticatedUsername, Long trainingId) {
+        if (trainingId == null) {
+            throw new ValidationException("Training id is required");
+        }
+        Training training = trainingDao.findById(trainingId)
+                .orElseThrow(() -> new EntityNotFoundException("Training not found: " + trainingId));
+        if (!authenticatedUsername.equals(training.getTrainee().getUsername())
+                && !authenticatedUsername.equals(training.getTrainer().getUsername())) {
+            throw new SecurityException("Authenticated user must be trainee or trainer from training");
+        }
+        publishWorkload(training, training.getTrainer(), WorkloadActionType.DELETE);
+        trainingDao.delete(trainingId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Training> selectProfileById(Long id) {
+        LOGGER.info("Selecting training profile with id {}", id);
+        return trainingDao.findById(id);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TrainingType> getTrainingTypes() {
+        return trainingDao.findTrainingTypes();
+    }
+
+    @Autowired
+    public void setTrainingDao(TrainingDao trainingDao) {
+        this.trainingDao = trainingDao;
+    }
+
+    @Autowired
+    public void setTraineeDao(TraineeDao traineeDao) {
+        this.traineeDao = traineeDao;
+    }
+
+    @Autowired
+    public void setTrainerDao(TrainerDao trainerDao) {
+        this.trainerDao = trainerDao;
+    }
+
+    @Autowired
+    public void setWorkloadEventPublisher(WorkloadEventPublisher workloadEventPublisher) {
+        this.workloadEventPublisher = workloadEventPublisher;
+    }
+
+    private void publishWorkload(Training training, Trainer trainer, WorkloadActionType actionType) {
+        workloadEventPublisher.publish(new TrainerWorkloadRequest(
+                trainer.getUsername(),
+                trainer.getFirstName(),
+                trainer.getLastName(),
+                trainer.isActive(),
+                training.getTrainingDate(),
+                training.getTrainingDuration(),
+                actionType));
+    }
+}

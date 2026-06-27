@@ -1,0 +1,9 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Trainer Workload Service" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <module name="trainer-workload-service" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="com.gymcrm.workload.TrainerWorkloadApplication" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
