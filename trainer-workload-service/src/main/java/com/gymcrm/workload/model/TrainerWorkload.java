@@ -1,14 +1,27 @@
 package com.gymcrm.workload.model;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
+import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.util.ArrayList;
+import java.util.List;
+
+@Document(collection = "trainer_workloads")
+@CompoundIndexes({
+        @CompoundIndex(name = "first_last_name_idx", def = "{'trainerFirstName': 1, 'trainerLastName': 1}")
+})
 public class TrainerWorkload {
-    private final String trainerUsername;
-    private volatile String trainerFirstName;
-    private volatile String trainerLastName;
-    private volatile boolean active;
-    private final Map<Integer, Map<Integer, Integer>> durationsByYearMonth = new ConcurrentHashMap<>();
+    @Id
+    private String trainerUsername;
+    private String trainerFirstName;
+    private String trainerLastName;
+    private boolean active;
+    private List<YearSummary> yearsList = new ArrayList<>();
+
+    public TrainerWorkload() {
+    }
 
     public TrainerWorkload(String trainerUsername, String trainerFirstName, String trainerLastName, boolean active) {
         this.trainerUsername = trainerUsername;
@@ -17,34 +30,43 @@ public class TrainerWorkload {
         this.active = active;
     }
 
-    public synchronized void apply(String firstName, String lastName, boolean active, int year, int month,
-                                   int durationDelta) {
-        this.trainerFirstName = firstName;
-        this.trainerLastName = lastName;
-        this.active = active;
-        Map<Integer, Integer> monthDurations = durationsByYearMonth.computeIfAbsent(
-                year, ignored -> new ConcurrentHashMap<>());
-        int updatedDuration = Math.max(0, monthDurations.getOrDefault(month, 0) + durationDelta);
-        monthDurations.put(month, updatedDuration);
-    }
-
     public String getTrainerUsername() {
         return trainerUsername;
+    }
+
+    public void setTrainerUsername(String trainerUsername) {
+        this.trainerUsername = trainerUsername;
     }
 
     public String getTrainerFirstName() {
         return trainerFirstName;
     }
 
+    public void setTrainerFirstName(String trainerFirstName) {
+        this.trainerFirstName = trainerFirstName;
+    }
+
     public String getTrainerLastName() {
         return trainerLastName;
+    }
+
+    public void setTrainerLastName(String trainerLastName) {
+        this.trainerLastName = trainerLastName;
     }
 
     public boolean isActive() {
         return active;
     }
 
-    public Map<Integer, Map<Integer, Integer>> getDurationsByYearMonth() {
-        return durationsByYearMonth;
+    public void setActive(boolean active) {
+        this.active = active;
+    }
+
+    public List<YearSummary> getYearsList() {
+        return yearsList;
+    }
+
+    public void setYearsList(List<YearSummary> yearsList) {
+        this.yearsList = yearsList;
     }
 }
